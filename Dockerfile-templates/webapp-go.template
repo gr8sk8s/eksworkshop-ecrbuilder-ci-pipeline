@@ -1,6 +1,6 @@
 # This is a multi-stage build. First we are going to compile and then
 # create a small image for runtime.
-FROM $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/approved-images/base-golang:1.19.0-buster as builder
+FROM $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/approved-images/base-golang:1.11.1 as builder
 
 RUN mkdir -p /app-dir
 WORKDIR /app-dir
