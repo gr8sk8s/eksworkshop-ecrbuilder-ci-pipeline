@@ -1,0 +1,42 @@
+---
+version: 0.2
+phases:
+
+  install:
+    commands:
+      - which docker && docker --version
+      - which git && git --version
+      - which aws && aws --version
+      - which kubectl && kubectl version --client --short
+
+  pre_build:
+      commands:
+        - TAG="$REPOSITORY_NAME/$REPOSITORY_BRANCH/$(date +%Y-%m-%d-%H-%M-%S)/$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | head -c 8)"
+        - sed -i 's@CONTAINER_IMAGE@'"$REPOSITORY_URI:$TAG"'@' hello-k8s.yml
+        - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+        - export KUBECONFIG=$HOME/.kube/config
+        
+  build:
+    commands:
+      - echo $REPOSITORY_URI:$TAG  
+      - docker build --tag $REPOSITORY_URI:$TAG .
+      - TAG2="latest"
+      - docker tag $REPOSITORY_URI:$TAG  $REPOSITORY_URI:$TAG2  
+
+  post_build:
+    commands:
+      - docker push $REPOSITORY_URI:$TAG
+      - echo $REPOSITORY_URI:$TAG2
+      - docker push $REPOSITORY_URI:$TAG2 
+      - | 
+        CREDENTIALS=$(aws sts assume-role --role-arn $EKS_KUBECTL_ROLE_ARN --role-session-name codebuild-kubectl --duration-seconds 900)
+        export AWS_ACCESS_KEY_ID="$(echo ${CREDENTIALS} | jq -r '.Credentials.AccessKeyId')"
+        export AWS_SECRET_ACCESS_KEY="$(echo ${CREDENTIALS} | jq -r '.Credentials.SecretAccessKey')"
+        export AWS_SESSION_TOKEN="$(echo ${CREDENTIALS} | jq -r '.Credentials.SessionToken')"
+        export AWS_EXPIRATION=$(echo ${CREDENTIALS} | jq -r '.Credentials.Expiration')
+      - aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
+      - kubectl apply -f hello-k8s.yml
+      - printf '[{"name":"hello-k8s","imageUri":"%s"}]' $REPOSITORY_URI:$TAG > build.json
+      
+artifacts:
+  files: build.json
