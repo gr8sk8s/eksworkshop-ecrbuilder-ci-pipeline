@@ -1,6 +1,8 @@
-echo aws cloudformation create-stack \
+# source this file 
+
+aws cloudformation create-stack \
     --stack-name build-ecr-image-pipeline-stack \
-    --template-body file://build-ecr-image-pipeline.cfn.yml \
+    --template-body file://$PIPELINE_FILE \
     --parameters \
     ParameterKey=EksClusterName,ParameterValue=$CLUSTER_NAME \
     ParameterKey=GitHubUser,ParameterValue=$GitHubUser \
