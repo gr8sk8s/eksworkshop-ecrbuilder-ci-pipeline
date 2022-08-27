@@ -1,18 +1,23 @@
-# This is a multi-stage build. First we are going to compile and then
-# create a small image for runtime.
+# This is a multi-stage build (final will be small container, under 7MB!) 
+# for a go webapp for use in various eks workshops
+
+# first let's grab the approved base image for golang compiler from the ECR repo
 FROM $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/approved-images/base-golang:1.11.1 as builder
 
-RUN mkdir -p /app-dir
+LABEL Conrad Fernandes maintainer
+
+# Create application dir for the go app, add non-root user, and complile
 WORKDIR /app-dir
-RUN useradd -u 10001 app
-COPY . .
+RUN useradd -u 10001 nonrootuser
+COPY *.go .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
+# create new container from scratch and copy the built app
 FROM scratch
-
 COPY --from=builder /app-dir/main /main
 COPY --from=builder /etc/passwd /etc/passwd
-USER app
+USER nonrootuser
 
+# run the go webapp service over this port:
 EXPOSE 8080
-CMD ["/main"]
+ENTRYPOINT ["/main"]
